@@ -69,7 +69,7 @@ export const useMediaDevice = () => {
    * 2. 권한 요청
    * 3. 장치 목록 조회
    */
-  const fetchDevices = async () => {
+  const getMediaDevices = async () => {
     setDeviceError(null)
 
     const isNavigatorUndefined = typeof navigator === "undefined"
@@ -285,7 +285,7 @@ export const useMediaDevice = () => {
     stream,
     streamState,
     handleDeviceChange,
-    fetchDevices,
+    getMediaDevices,
     connectStream,
     stopStream,
   }
