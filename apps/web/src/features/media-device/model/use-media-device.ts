@@ -19,6 +19,9 @@ interface StreamState {
 
 export const useMediaDevice = () => {
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false)
+  const [isConnectingStream, setIsConnectingStream] = useState(false)
+
   const [devices, setDevices] = useState<MediaDeviceState>({
     videoDevices: [],
     audioDevices: [],
@@ -71,6 +74,7 @@ export const useMediaDevice = () => {
    */
   const getMediaDevices = async () => {
     setDeviceError(null)
+    setIsLoadingDevices(true)
 
     const isNavigatorUndefined = typeof navigator === "undefined"
     const isMediaDevicesUnavailable = !navigator?.mediaDevices
@@ -85,6 +89,7 @@ export const useMediaDevice = () => {
         audioDevices: [],
       })
       setIsInitialized(true)
+      setIsLoadingDevices(false)
 
       return
     }
@@ -99,6 +104,7 @@ export const useMediaDevice = () => {
         audioDevices: [],
       })
       setIsInitialized(true)
+      setIsLoadingDevices(false)
 
       return
     }
@@ -115,6 +121,8 @@ export const useMediaDevice = () => {
       console.error(errorMessage, error)
       setDeviceError(errorMessage)
       setIsInitialized(true)
+    } finally {
+      setIsLoadingDevices(false)
     }
   }
 
@@ -219,11 +227,14 @@ export const useMediaDevice = () => {
    */
   const connectStream = async () => {
     setDeviceError(null)
+    setIsConnectingStream(true)
+
     const isAccessibleUserMedia = !!navigator.mediaDevices?.getUserMedia
 
     if (!isAccessibleUserMedia) {
       const errorMessage = "브라우저가 카메라/마이크 접근 기능을 지원하지 않습니다."
       setDeviceError(errorMessage)
+      setIsConnectingStream(false)
       return
     }
 
@@ -233,6 +244,7 @@ export const useMediaDevice = () => {
     if (!isVideoSelected && !isAudioSelected) {
       const errorMessage = "카메라 또는 마이크를 선택해주세요. 최소 하나의 미디어 장치가 필요합니다."
       setDeviceError(errorMessage)
+      setIsConnectingStream(false)
       return
     }
 
@@ -274,11 +286,15 @@ export const useMediaDevice = () => {
       setDeviceError(errorMessage)
 
       return null
+    } finally {
+      setIsConnectingStream(false)
     }
   }
 
   return {
     isInitialized,
+    isLoadingDevices,
+    isConnectingStream,
     devices,
     selectedDevices,
     deviceError,
