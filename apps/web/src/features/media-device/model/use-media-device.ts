@@ -2,17 +2,17 @@
 
 import { useState } from "react"
 
-type MediaDeviceState = {
+interface MediaDeviceState {
   videoDevices: MediaDeviceInfo[]
   audioDevices: MediaDeviceInfo[]
 }
 
-type SelectedDevicesState = {
+interface SelectedDevicesState {
   videoDeviceId: string | null
   audioDeviceId: string | null
 }
 
-type StreamState = {
+interface StreamState {
   hasAudio: boolean
   hasVideo: boolean
 }
