@@ -18,6 +18,7 @@ interface StreamState {
 }
 
 export const useMediaDevice = () => {
+  const [isInitialized, setIsInitialized] = useState(false)
   const [devices, setDevices] = useState<MediaDeviceState>({
     videoDevices: [],
     audioDevices: [],
@@ -83,6 +84,7 @@ export const useMediaDevice = () => {
         videoDevices: [],
         audioDevices: [],
       })
+      setIsInitialized(true)
 
       return
     }
@@ -96,6 +98,7 @@ export const useMediaDevice = () => {
         videoDevices: [],
         audioDevices: [],
       })
+      setIsInitialized(true)
 
       return
     }
@@ -105,11 +108,13 @@ export const useMediaDevice = () => {
       await requestMediaPermissions()
       // 미디어 장치 목록 획득
       await enumerateAndSetDevices()
+      setIsInitialized(true)
 
     } catch (error) {
       const errorMessage = "장치 목록 가져오기에 실패했습니다."
       console.error(errorMessage, error)
       setDeviceError(errorMessage)
+      setIsInitialized(true)
     }
   }
 
@@ -273,6 +278,7 @@ export const useMediaDevice = () => {
   }
 
   return {
+    isInitialized,
     devices,
     selectedDevices,
     deviceError,
