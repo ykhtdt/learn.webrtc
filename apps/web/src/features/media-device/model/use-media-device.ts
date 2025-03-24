@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 interface MediaDeviceState {
   videoDevices: MediaDeviceInfo[]
@@ -17,10 +17,20 @@ interface StreamState {
   hasVideo: boolean
 }
 
+type PermissionStatus = "granted" | "denied" | "prompt" | "unknown"
+
+interface PermissionState {
+  video: PermissionStatus
+  audio: PermissionStatus
+}
+
 export const useMediaDevice = () => {
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
   const [isConnectingStream, setIsConnectingStream] = useState(false)
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
+
+  const [deviceError, setDeviceError] = useState<string | null>(null)
 
   const [devices, setDevices] = useState<MediaDeviceState>({
     videoDevices: [],
@@ -38,7 +48,85 @@ export const useMediaDevice = () => {
     hasAudio: false,
   })
 
-  const [deviceError, setDeviceError] = useState<string | null>(null)
+  const [permissions, setPermissions] = useState<PermissionState>({
+    video: "unknown",
+    audio: "unknown",
+  })
+
+  const getVideoPermissionMessage = () => {
+    switch (permissions.video) {
+      case "granted":
+        return "카메라 접근 권한이 허용되었습니다."
+      case "denied":
+        return "카메라 접근이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+      case "prompt":
+        return "카메라 접근 권한을 요청합니다."
+      default:
+        return "카메라 접근 권한 상태를 확인할 수 없습니다."
+    }
+  }
+
+  const getAudioPermissionMessage = () => {
+    switch (permissions.audio) {
+      case "granted":
+        return "마이크 접근 권한이 허용되었습니다."
+      case "denied":
+        return "마이크 접근이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+      case "prompt":
+        return "마이크 접근 권한을 요청합니다."
+      default:
+        return "마이크 접근 권한 상태를 확인할 수 없습니다."
+    }
+  }
+
+  const checkDevicePermission = async (device: "camera" | "microphone"): Promise<PermissionStatus> => {
+    try {
+      const { state } = await navigator.permissions.query({ name: device as PermissionName })
+      return state
+    } catch (error) {
+      console.warn(`${device === "camera" ? "카메라" : "마이크"} 권한 상태를 확인할 수 없습니다:`, error)
+      return "unknown"
+    }
+  }
+
+  const checkPermissions = async () => {
+    const isNavigatorUndefined = typeof navigator === "undefined"
+    const isPermissionsApiUnavailable = !navigator?.permissions
+
+    if (isNavigatorUndefined || isPermissionsApiUnavailable) {
+      setPermissions({
+        video: "unknown",
+        audio: "unknown"
+      })
+      return
+    }
+
+    setIsCheckingPermissions(true)
+
+    try {
+      const [videoPermission, audioPermission] = await Promise.all([
+        checkDevicePermission("camera"),
+        checkDevicePermission("microphone")
+      ])
+
+      setPermissions({
+        video: videoPermission,
+        audio: audioPermission,
+      })
+    } finally {
+      setIsCheckingPermissions(false)
+    }
+  }
+
+  /**
+   * 미디어 장치 초기화
+   * 1. 권한 상태 확인
+   * 2. 장치 목록 조회
+   */
+  const initializeMediaDevices = async () => {
+    await checkPermissions()
+    await getMediaDevices()
+  }
 
   /**
    * 디바이스 종류와 ID를 받아 선택된 디바이스 상태를 업데이트합니다.
@@ -221,6 +309,54 @@ export const useMediaDevice = () => {
 
   }
 
+  useEffect(() => {
+    const isNavigatorUndefined = typeof navigator === "undefined"
+    const isMediaDevicesUnavailable = !navigator?.mediaDevices
+
+    // 예상되는 환경: 서버 렌더링 환경
+    if (isNavigatorUndefined) {
+      const errorMessage = "서버 환경에서 미디어 장치에 접근할 수 없습니다."
+      console.error(errorMessage)
+      setDeviceError(errorMessage)
+      setDevices({
+        videoDevices: [],
+        audioDevices: [],
+      })
+      setIsInitialized(true)
+      setIsLoadingDevices(false)
+
+      return
+    }
+
+    // 예상되는 환경: 브라우저 미지원 또는 비보안 컨텍스트(HTTP 등)
+    if (isMediaDevicesUnavailable) {
+      const errorMessage = "브라우저가 미디어 장치 API를 지원하지 않습니다."
+      console.error(errorMessage)
+      setDeviceError(errorMessage)
+      setDevices({
+        videoDevices: [],
+        audioDevices: [],
+      })
+      setIsInitialized(true)
+      setIsLoadingDevices(false)
+
+      return
+    }
+
+    // 장치가 변경되었을 때 장치 목록 갱신
+    const handleDeviceChange = () => {
+      if (isInitialized) {
+        enumerateAndSetDevices()
+      }
+    }
+
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange)
+
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange)
+    }
+  }, [isInitialized, enumerateAndSetDevices])
+
   /**
    * 선택한 장치로 미디어 스트림을 연결합니다.
    * 기존 스트림은 자동으로 정리됩니다.
@@ -304,5 +440,11 @@ export const useMediaDevice = () => {
     getMediaDevices,
     connectStream,
     stopStream,
+    permissions,
+    isCheckingPermissions,
+    getVideoPermissionMessage,
+    getAudioPermissionMessage,
+    checkPermissions,
+    initializeMediaDevices,
   }
 }
