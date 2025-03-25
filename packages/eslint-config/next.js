@@ -55,13 +55,6 @@ export const nextJsConfig = [
         "error",
         "unix"
       ],
-      "indent": [
-        "error",
-        2,
-        {
-          "SwitchCase": 1
-        }
-      ],
       "no-tabs": [
         "error"
       ],
