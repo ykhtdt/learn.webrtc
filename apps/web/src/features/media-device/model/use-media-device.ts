@@ -413,6 +413,10 @@ export const useMediaDevice = () => {
     }
   }
 
+  useEffect(() => {
+    initializeMediaDevices()
+  }, [])
+
   return {
     isInitialized,
     isLoadingDevices,
@@ -431,6 +435,5 @@ export const useMediaDevice = () => {
     getVideoPermissionMessage,
     getAudioPermissionMessage,
     checkPermissions,
-    initializeMediaDevices,
   }
 }
