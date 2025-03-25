@@ -110,14 +110,14 @@ export const HomePage = () => {
                 <span>
                   초기화 중...
                 </span>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
               </div>
             ) : isConnectingStream ? (
               <div className="flex items-center justify-center gap-2">
                 <span>
                   연결 중...
                 </span>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
               "장치 연결"
@@ -130,7 +130,7 @@ export const HomePage = () => {
               <div className="flex flex-col items-center gap-2">
                 <Button
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-full text-white",
+                    "flex items-center justify-center w-10 h-10 rounded-full text-foreground",
                     streamState.isVideoEnabled ? "bg-blue-500 hover:bg-blue-600" : "bg-red-500 hover:bg-red-600"
                   )}
                   onClick={toggleVideo}
@@ -161,7 +161,7 @@ export const HomePage = () => {
               <div className="flex flex-col items-center gap-2">
                 <Button
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-full text-white",
+                    "flex items-center justify-center w-10 h-10 rounded-full text-foreground",
                     streamState.isAudioEnabled ? "bg-blue-500 hover:bg-blue-600" : "bg-red-500 hover:bg-red-600"
                   )}
                   onClick={toggleAudio}
@@ -196,7 +196,7 @@ export const HomePage = () => {
             <h2 className="text-sm font-medium mb-2">
               미디어 프리뷰
             </h2>
-            <div className="relative bg-gray-100 rounded-md overflow-hidden aspect-video w-full max-w-[320px] mx-auto">
+            <div className="relative bg-zinc-500 rounded-md overflow-hidden aspect-video w-full max-w-[320px] mx-auto">
               {streamState.hasVideo || streamState.hasAudio ? (
                 <video
                   ref={setVideoRef}
@@ -206,16 +206,16 @@ export const HomePage = () => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                <div className="flex items-center justify-center h-full text-sm">
                   {stream ? "비디오 신호가 없습니다" : "장치를 연결해주세요"}
                 </div>
               )}
 
               {/* 비디오 비활성화 표시 */}
               {stream && streamState.hasVideo && !streamState.isVideoEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-70 text-white">
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-500">
                   <div className="flex flex-col items-center">
-                    <VideoOffIcon className="w-10 h-10" />
+                    <VideoOffIcon className="size-8" />
                     <span className="mt-2 text-sm">
                       카메라가 꺼져 있습니다
                     </span>
