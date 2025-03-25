@@ -1,9 +1,13 @@
 {
   "eslint.workingDirectories": [
     {
-      "mode": "auto"
+      "pattern": "apps/*/"
+    },
+    {
+      "pattern": "packages/*/"
     }
   ],
+  "eslint.nodePath": "./node_modules/.pnpm/node_modules",
   "editor.tabSize": 2,
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -11,6 +15,13 @@
   },
   "css.customData": [
     ".vscode/css_custom.json"
+  ],
+  "eslint.useFlatConfig": true,
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
   ],
   "typescript.tsdk": "node_modules/typescript/lib",
   "tailwindCSS.experimental.classRegex": [

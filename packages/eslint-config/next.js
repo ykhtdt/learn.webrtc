@@ -48,4 +48,33 @@ export const nextJsConfig = [
       "react/prop-types": "off",
     },
   },
+  {
+    rules: {
+      "react/no-children-prop": "off",
+      "linebreak-style": [
+        "error",
+        "unix"
+      ],
+      "indent": [
+        "error",
+        2,
+        {
+          "SwitchCase": 1
+        }
+      ],
+      "no-tabs": [
+        "error"
+      ],
+      "semi": [
+        "error",
+        "never"
+      ],
+      "quotes": [
+        "error",
+        "double"
+      ],
+      "eol-last": ["error", "always"],
+      "@typescript-eslint/no-explicit-any": "off"
+    },
+  },
 ]
