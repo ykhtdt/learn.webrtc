@@ -12,8 +12,9 @@ import { useMediaDevice } from "@/features/media-device"
 
 export const HomePage = () => {
   const {
-    // isInitialized,
     devices,
+    selectedDevices,
+    handleDeviceChange,
   } = useMediaDevice()
 
   return (
@@ -25,25 +26,28 @@ export const HomePage = () => {
           WebRTC 장치 테스트
         </h1>
 
-        {/* Device Selection */}
+        {/* Device Select */}
         <div className="space-y-4">
           {/* Video Device */}
           <div className="space-y-2">
             <h2 className="text-sm font-medium">
               비디오 장치
             </h2>
-            <Select>
+            <Select
+              value={selectedDevices.videoDeviceId || undefined}
+              onValueChange={(value) => handleDeviceChange("video", value)}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="비디오 장치 선택" />
               </SelectTrigger>
               <SelectContent>
                 {devices.videoDevices.map((device) => (
                   <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.label || `비디오 장치 ${device.deviceId.substring(0, 8)}`}
+                    {device.label}
                   </SelectItem>
                 ))}
                 {devices.videoDevices.length === 0 && (
-                  <SelectItem value="no-device" disabled>
+                  <SelectItem value="none" disabled>
                     사용 가능한 비디오 장치가 없습니다
                   </SelectItem>
                 )}
@@ -56,18 +60,21 @@ export const HomePage = () => {
             <h2 className="text-sm font-medium">
               오디오 입력 장치
             </h2>
-            <Select>
+            <Select
+              value={selectedDevices.audioDeviceId || undefined}
+              onValueChange={(value) => handleDeviceChange("audio", value)}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="오디오 입력 장치 선택" />
               </SelectTrigger>
               <SelectContent>
-                {devices.audioDevices.filter(device => device.kind === "audioinput").map((device) => (
+                {devices.audioDevices.map((device) => (
                   <SelectItem key={device.deviceId} value={device.deviceId}>
-                    {device.label || `오디오 입력 장치 ${device.deviceId.substring(0, 8)}`}
+                    {device.label}
                   </SelectItem>
                 ))}
-                {devices.audioDevices.filter(device => device.kind === "audioinput").length === 0 && (
-                  <SelectItem value="no-device" disabled>
+                {devices.audioDevices.length === 0 && (
+                  <SelectItem value="none" disabled>
                     사용 가능한 오디오 입력 장치가 없습니다
                   </SelectItem>
                 )}
