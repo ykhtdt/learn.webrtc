@@ -1,6 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import {
+  useEffect,
+  useState,
+  useRef,
+} from "react"
 
 interface MediaDeviceState {
   videoDevices: MediaDeviceInfo[]
@@ -15,6 +19,8 @@ interface SelectedDevicesState {
 interface StreamState {
   hasAudio: boolean
   hasVideo: boolean
+  isVideoEnabled: boolean
+  isAudioEnabled: boolean
 }
 
 type PermissionStatus = "granted" | "denied" | "prompt" | "unknown"
@@ -25,6 +31,8 @@ interface PermissionState {
 }
 
 export const useMediaDevice = () => {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
   const [isConnectingStream, setIsConnectingStream] = useState(false)
@@ -61,6 +69,8 @@ export const useMediaDevice = () => {
   const [streamState, setStreamState] = useState<StreamState>({
     hasVideo: false,
     hasAudio: false,
+    isVideoEnabled: true,
+    isAudioEnabled: true,
   })
 
   const [permissions, setPermissions] = useState<PermissionState>({
@@ -162,6 +172,8 @@ export const useMediaDevice = () => {
       setStreamState({
         hasVideo: false,
         hasAudio: false,
+        isVideoEnabled: true,
+        isAudioEnabled: true,
       })
     }
   }
@@ -346,6 +358,19 @@ export const useMediaDevice = () => {
   }, [isInitialized, enumerateAndSetDevices])
 
   /**
+   * 비디오 요소 참조를 설정
+   */
+  const setVideoRef = (ref: HTMLVideoElement | null) => {
+    videoRef.current = ref
+
+    const isVideoStreamReady = ref && stream
+
+    if (isVideoStreamReady) {
+      ref.srcObject = stream
+    }
+  }
+
+  /**
    * 선택한 장치로 미디어 스트림을 연결합니다.
    * 기존 스트림은 자동으로 정리됩니다.
    */
@@ -389,7 +414,14 @@ export const useMediaDevice = () => {
       setStreamState({
         hasVideo: newStream.getVideoTracks().length > 0,
         hasAudio: newStream.getAudioTracks().length > 0,
+        isVideoEnabled: true,
+        isAudioEnabled: true,
       })
+
+      // 비디오 요소가 있는 경우 스트림 연결
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream
+      }
 
       return newStream
     } catch (error: any) {
@@ -413,6 +445,119 @@ export const useMediaDevice = () => {
     }
   }
 
+  /**
+   * 비디오 트랙을 켜거나 끕니다.
+   */
+  const toggleVideo = () => {
+    if (!stream) {
+      return
+    }
+
+    const videoTracks = stream.getVideoTracks()
+    const hasVideoTracks = videoTracks.length > 0
+
+    if (!hasVideoTracks) {
+      return
+    }
+
+    const firstTrack = videoTracks[0]
+    const isCurrentlyEnabled = firstTrack ? firstTrack.enabled : false
+
+    videoTracks.forEach(track => {
+      track.enabled = !isCurrentlyEnabled
+    })
+
+    setStreamState(prev => ({
+      ...prev,
+      isVideoEnabled: !isCurrentlyEnabled
+    }))
+  }
+
+  /**
+   * 오디오 트랙을 켜거나 끕니다.
+   */
+  const toggleAudio = () => {
+    if (!stream) {
+      return
+    }
+
+    const audioTracks = stream.getAudioTracks()
+    const hasAudioTracks = audioTracks.length > 0
+
+    if (!hasAudioTracks) {
+      return
+    }
+
+    const firstTrack = audioTracks[0]
+    const isCurrentlyEnabled = firstTrack ? firstTrack.enabled : false
+
+    audioTracks.forEach(track => {
+      track.enabled = !isCurrentlyEnabled
+    })
+
+    setStreamState(prev => ({
+      ...prev,
+      isAudioEnabled: !isCurrentlyEnabled
+    }))
+  }
+
+  /**
+   * 비디오 장치 연결을 해제합니다.
+   */
+  const disconnectVideo = () => {
+    if (!stream) {
+      return
+    }
+
+    const videoTracks = stream.getVideoTracks()
+    videoTracks.forEach(track => track.stop())
+
+    setStreamState(prev => ({
+      ...prev,
+      hasVideo: false,
+      isVideoEnabled: false
+    }))
+
+    // 비디오 트랙이 모두 제거된 경우 스트림도 정리
+    if (stream.getTracks().length === 0) {
+      stopStream()
+    }
+  }
+
+  /**
+   * 오디오 장치 연결을 해제합니다.
+   */
+  const disconnectAudio = () => {
+    if (!stream) {
+      return
+    }
+
+    const audioTracks = stream.getAudioTracks()
+    audioTracks.forEach(track => track.stop())
+
+    setStreamState(prev => ({
+      ...prev,
+      hasAudio: false,
+      isAudioEnabled: false
+    }))
+
+    // 오디오 트랙이 모두 제거된 경우 스트림도 정리
+    if (stream.getTracks().length === 0) {
+      stopStream()
+    }
+  }
+
+  // 스트림이 변경될 때 비디오 요소에 연결
+  useEffect(() => {
+    if (videoRef.current) {
+      const isVideoStreamReady = videoRef.current && stream
+
+      if (isVideoStreamReady) {
+        videoRef.current.srcObject = stream
+      }
+    }
+  }, [stream])
+
   useEffect(() => {
     initializeMediaDevices()
   }, [])
@@ -435,5 +580,11 @@ export const useMediaDevice = () => {
     getVideoPermissionMessage,
     getAudioPermissionMessage,
     checkPermissions,
+    videoRef,
+    setVideoRef,
+    toggleVideo,
+    toggleAudio,
+    disconnectVideo,
+    disconnectAudio,
   }
 }
