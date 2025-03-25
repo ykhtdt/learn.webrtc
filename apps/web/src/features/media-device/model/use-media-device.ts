@@ -37,6 +37,12 @@ export const useMediaDevice = () => {
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
   const [isConnectingStream, setIsConnectingStream] = useState(false)
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
+  const [hasRequestedPermission, setHasRequestedPermission] = useState(false)
+  const [previousPermissions, setPreviousPermissions] = useState<PermissionState>({
+    video: "unknown",
+    audio: "unknown"
+  })
+  const [hasPermissionChanged, setHasPermissionChanged] = useState(false)
 
   const [deviceError, setDeviceError] = useState<string | null>(null)
 
@@ -377,6 +383,8 @@ export const useMediaDevice = () => {
   const connectStream = async () => {
     setDeviceError(null)
     setIsConnectingStream(true)
+    setHasRequestedPermission(true)
+    setPreviousPermissions(permissions)
 
     if (isMediaDevicesUnavailable() || !navigator.mediaDevices.getUserMedia) {
       const errorMessage = "브라우저가 카메라/마이크 접근 기능을 지원하지 않습니다."
@@ -558,6 +566,21 @@ export const useMediaDevice = () => {
     }
   }, [stream])
 
+  // 권한 상태 변경 감지
+  useEffect(() => {
+    if (hasRequestedPermission) {
+      const changed =
+        permissions.video !== previousPermissions.video ||
+        permissions.audio !== previousPermissions.audio
+
+      setHasPermissionChanged(changed)
+
+      if (changed) {
+        setHasRequestedPermission(false)
+      }
+    }
+  }, [permissions, previousPermissions, hasRequestedPermission])
+
   useEffect(() => {
     initializeMediaDevices()
   }, [])
@@ -586,5 +609,7 @@ export const useMediaDevice = () => {
     toggleAudio,
     disconnectVideo,
     disconnectAudio,
+    hasRequestedPermission,
+    hasPermissionChanged,
   }
 }

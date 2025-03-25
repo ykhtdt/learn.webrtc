@@ -35,6 +35,8 @@ export const HomePage = () => {
     isConnectingStream,
     getVideoPermissionMessage,
     getAudioPermissionMessage,
+    hasRequestedPermission,
+    hasPermissionChanged,
   } = useMediaDevice()
 
   return (
@@ -45,6 +47,24 @@ export const HomePage = () => {
         <h1 className="text-base font-bold">
           WebRTC 장치 테스트
         </h1>
+
+        {/* 권한 요청 후 안내 메시지 */}
+        {!hasPermissionChanged && (
+          <div className="p-3 rounded-md bg-yellow-100 text-yellow-800 text-sm">
+            <p className="font-medium mb-2">
+              권한 변경이 완료되었습니다
+            </p>
+            <p className="mb-2">
+              브라우저에서 권한을 변경하셨다면, 변경사항을 적용하기 위해 페이지를 새로고침해주세요.
+            </p>
+            <Button
+              className="w-full bg-yellow-500 text-white hover:bg-yellow-600"
+              onClick={() => window.location.reload()}
+            >
+              페이지 새로고침
+            </Button>
+          </div>
+        )}
 
         {/* Permission Status */}
         <div className="space-y-2">
