@@ -1,12 +1,16 @@
-import { Button } from "@workspace/ui/components/button"
+"use client"
+
+import dynamic from "next/dynamic"
+
+const HomePage = dynamic(() =>
+  import("../src/pages/home/ui/home-page").then((mod) => mod.HomePage),
+  {
+    ssr: false,
+  },
+)
 
 export default function Page() {
   return (
-    <div className="flex items-center justify-center min-h-svh">
-      <div className="flex flex-col items-center justify-center gap-4">
-        <h1 className="text-2xl font-bold">Hello World</h1>
-        <Button size="sm">Button</Button>
-      </div>
-    </div>
+    <HomePage />
   )
 }
