@@ -2,41 +2,47 @@
 
 import { Button } from "@workspace/ui/components/button"
 
-interface MediaRecorderControlsProps {
-  isRecording: boolean
-  hasVideo: boolean
+import { useMediaRecorder } from "@/features/media-recorder"
+
+interface StreamState {
   hasAudio: boolean
+  hasVideo: boolean
   isVideoEnabled: boolean
   isAudioEnabled: boolean
-  duration: number
-  formattedDuration: string
-  error: string | null
-  hasRecordedChunks: boolean
-  onStart: () => void
-  onStop: () => void
-  onDownload: () => void
+}
+
+interface MediaRecorderControlsProps {
+  stream: MediaStream | null
+  streamState: StreamState
 }
 
 export const MediaRecorderControl = ({
-  isRecording,
-  hasVideo,
-  hasAudio,
-  isVideoEnabled,
-  isAudioEnabled,
-  formattedDuration,
-  error,
-  hasRecordedChunks,
-  onStart,
-  onStop,
-  onDownload,
+  stream,
+  streamState,
 }: MediaRecorderControlsProps) => {
+  const {
+    isRecording,
+    hasVideo,
+    hasAudio,
+    formattedDuration,
+    recorderError,
+    startRecording,
+    stopRecording,
+    handleDownload,
+    recordedChunks,
+  } = useMediaRecorder(stream)
+
+  const isVideoEnabled = streamState.isVideoEnabled
+  const isAudioEnabled = streamState.isAudioEnabled
+  const hasRecordedChunks = recordedChunks.length > 0
+
   return (
     <div className="space-y-4">
 
       {/* 에러 메시지 */}
-      {error && (
+      {recorderError && (
         <div className="p-3 rounded-md bg-red-100 text-red-800 text-sm">
-          {error}
+          {recorderError}
         </div>
       )}
 
@@ -70,14 +76,14 @@ export const MediaRecorderControl = ({
       <div className="flex items-center justify-center space-x-4">
         {!isRecording ? (
           <Button
-            onClick={onStart}
+            onClick={startRecording}
             className="bg-red-500 text-white hover:bg-red-600"
           >
             녹화 시작
           </Button>
         ) : (
           <Button
-            onClick={onStop}
+            onClick={stopRecording}
             className="bg-red-500 text-white hover:bg-red-600"
           >
             녹화 중지
@@ -88,7 +94,7 @@ export const MediaRecorderControl = ({
       {/* 다운로드 버튼 */}
       {!isRecording && hasRecordedChunks && (
         <Button
-          onClick={onDownload}
+          onClick={handleDownload}
           className="w-full bg-blue-500 text-white hover:bg-blue-600"
         >
           녹화 파일 다운로드

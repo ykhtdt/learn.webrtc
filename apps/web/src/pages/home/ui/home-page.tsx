@@ -18,10 +18,7 @@ import {
 } from "@workspace/ui/components/select"
 
 import { useMediaDevice } from "@/features/media-device"
-import {
-  useMediaRecorder,
-  MediaRecorderControl,
-} from "@/features/media-recorder"
+import { MediaRecorderControl } from "@/features/media-recorder"
 
 export const HomePage = () => {
   const {
@@ -41,19 +38,6 @@ export const HomePage = () => {
     getAudioPermissionMessage,
     deviceError,
   } = useMediaDevice()
-
-  const {
-    isRecording,
-    hasVideo,
-    hasAudio,
-    duration,
-    formattedDuration,
-    recorderError,
-    startRecording,
-    stopRecording,
-    handleDownload,
-    recordedChunks,
-  } = useMediaRecorder(stream)
 
   return (
     <div className="flex flex-col items-center justify-center min-h-dvh p-4">
@@ -328,20 +312,7 @@ export const HomePage = () => {
 
             {/* Media Recorder Controls */}
             {(permissions.video === "granted" || permissions.audio === "granted") && (
-              <MediaRecorderControl
-                isRecording={isRecording}
-                hasVideo={hasVideo}
-                hasAudio={hasAudio}
-                isVideoEnabled={streamState.isVideoEnabled}
-                isAudioEnabled={streamState.isAudioEnabled}
-                duration={duration}
-                formattedDuration={formattedDuration}
-                error={recorderError}
-                hasRecordedChunks={recordedChunks.length > 0}
-                onStart={startRecording}
-                onStop={stopRecording}
-                onDownload={handleDownload}
-              />
+              <MediaRecorderControl stream={stream} streamState={streamState} />
             )}
           </div>
         )}
