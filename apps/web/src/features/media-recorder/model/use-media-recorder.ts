@@ -31,6 +31,8 @@ export const useMediaRecorder = (
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const startTimeRef = useRef<number>(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const previousVideoEnabledRef = useRef<boolean>(false)
+  const previousAudioEnabledRef = useRef<boolean>(false)
 
   const getSupportedMimeType = useCallback(() => {
     const types = [
@@ -38,7 +40,11 @@ export const useMediaRecorder = (
       "video/webm;codecs=vp9",
       "video/webm;codecs=h264,opus",
       "video/webm",
-      "video/mp4"
+      "video/mp4",
+      "audio/webm",
+      "audio/webm;codecs=opus",
+      "audio/ogg",
+      "audio/ogg;codecs=opus"
     ]
 
     for (const type of types) {
@@ -106,8 +112,11 @@ export const useMediaRecorder = (
       return
     }
 
-    const hasVideo = stream.getVideoTracks().length > 0
-    const hasAudio = stream.getAudioTracks().length > 0
+    const videoTrack = stream.getVideoTracks()[0]
+    const audioTrack = stream.getAudioTracks()[0]
+
+    const hasVideo = videoTrack?.enabled ?? false
+    const hasAudio = audioTrack?.enabled ?? false
 
     if (!hasVideo && !hasAudio) {
       setState(prev => ({
@@ -118,6 +127,63 @@ export const useMediaRecorder = (
     }
 
     try {
+      // 오디오만 녹음하는 경우
+      if (!hasVideo && hasAudio) {
+        const mimeType = getSupportedMimeType()
+        if (!mimeType) {
+          setState(prev => ({
+            ...prev,
+            recorderError: "지원되지 않는 오디오 형식입니다."
+          }))
+          return
+        }
+
+        const mediaRecorder = new MediaRecorder(stream, {
+          ...options,
+          mimeType,
+        })
+        mediaRecorderRef.current = mediaRecorder
+
+        const chunks: Blob[] = []
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            chunks.push(event.data)
+          }
+        }
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: "audio/mp3" })
+          setState(prev => ({
+            ...prev,
+            recordedChunks: [blob],
+            isRecording: false,
+            isPaused: false,
+            recorderError: null,
+            duration: 0,
+          }))
+        }
+
+        mediaRecorder.start()
+        startTimeRef.current = Date.now()
+
+        // 현재 장치 상태 저장
+        previousVideoEnabledRef.current = hasVideo
+        previousAudioEnabledRef.current = hasAudio
+
+        setState(prev => ({
+          ...prev,
+          isRecording: true,
+          isPaused: false,
+          hasVideo,
+          hasAudio,
+          recordedChunks: [],
+          recorderError: null,
+          duration: 0,
+        }))
+        return
+      }
+
+      // 비디오 녹화하는 경우
       const mimeType = options.mimeType || getSupportedMimeType()
       if (!mimeType) {
         setState(prev => ({
@@ -155,6 +221,10 @@ export const useMediaRecorder = (
       mediaRecorder.start()
       startTimeRef.current = Date.now()
 
+      // 현재 장치 상태 저장
+      previousVideoEnabledRef.current = hasVideo
+      previousAudioEnabledRef.current = hasAudio
+
       setState(prev => ({
         ...prev,
         isRecording: true,
@@ -182,6 +252,50 @@ export const useMediaRecorder = (
     mediaRecorderRef.current.stop()
   }, [])
 
+  // 장치 상태 변경 감지
+  useEffect(() => {
+    if (!stream || !state.isRecording) {
+      return
+    }
+
+    const videoTrack = stream.getVideoTracks()[0]
+    const audioTrack = stream.getAudioTracks()[0]
+
+    const handleVideoTrackEnabled = () => {
+      if (state.isRecording) {
+        const isVideoEnabled = videoTrack?.enabled ?? false
+        if (isVideoEnabled !== previousVideoEnabledRef.current) {
+          stopRecording()
+          setState(prev => ({
+            ...prev,
+            recorderError: "카메라 상태가 변경되어 녹화가 중지되었습니다."
+          }))
+        }
+      }
+    }
+
+    const handleAudioTrackEnabled = () => {
+      if (state.isRecording) {
+        const isAudioEnabled = audioTrack?.enabled ?? false
+        if (isAudioEnabled !== previousAudioEnabledRef.current) {
+          stopRecording()
+          setState(prev => ({
+            ...prev,
+            recorderError: "마이크 상태가 변경되어 녹화가 중지되었습니다."
+          }))
+        }
+      }
+    }
+
+    videoTrack?.addEventListener("enabled", handleVideoTrackEnabled)
+    audioTrack?.addEventListener("enabled", handleAudioTrackEnabled)
+
+    return () => {
+      videoTrack?.removeEventListener("enabled", handleVideoTrackEnabled)
+      audioTrack?.removeEventListener("enabled", handleAudioTrackEnabled)
+    }
+  }, [stream, state.isRecording, stopRecording])
+
   // 녹화된 미디어 다운로드
   const handleDownload = useCallback(() => {
     if (state.recordedChunks.length === 0) {
@@ -189,7 +303,9 @@ export const useMediaRecorder = (
     }
 
     const blob = state.recordedChunks[0]
-    if (!blob) return
+    if (!blob) {
+      return
+    }
 
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -207,15 +323,20 @@ export const useMediaRecorder = (
       hour12: false
     }).replace(/[^0-9]/g, "")
 
-    // MIME 타입에 따른 확장자 선택
-    const extension = blob.type.includes("webm") ? "webm" : "mp4"
-    a.download = `녹화_${formattedDate}.${extension}`
+    /**
+     * 카메라 사용 여부에 따라 확장자를 선택합니다.
+     * 1. 카메라 사용 시 비디오 녹화 파일
+     * 2. 카메라 미사용 시 오디오 녹음 파일
+     */
+    const extension = state.hasVideo ? (blob.type.includes("webm") ? "webm" : "mp4") : "mp3"
+    const prefix = state.hasVideo ? "녹화" : "녹음"
+    a.download = `${prefix}_${formattedDate}.${extension}`
 
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  }, [state.recordedChunks])
+  }, [state.recordedChunks, state.hasVideo])
 
   // 녹화된 미디어 URL 획득
   const getRecordingUrl = useCallback(() => {
@@ -224,7 +345,10 @@ export const useMediaRecorder = (
     }
 
     const blob = state.recordedChunks[0]
-    if (!blob) return null
+
+    if (!blob) {
+      return null
+    }
 
     return URL.createObjectURL(blob)
   }, [state.recordedChunks])
