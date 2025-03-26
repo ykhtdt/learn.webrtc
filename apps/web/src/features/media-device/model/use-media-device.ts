@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from "react"
 
 interface MediaDeviceState {
@@ -230,14 +231,11 @@ export const useMediaDevice = () => {
     try {
       // 미디어 장치 접근 권한 요청
       await requestMediaPermissions()
-      // 미디어 장치 목록 획득
+      // 권한 요청이 성공한 경우에 장치 목록 획득
       await enumerateAndSetDevices()
-      setIsInitialized(true)
 
-    } catch (error) {
-      const errorMessage = "장치 목록 가져오기에 실패했습니다."
-      console.error(errorMessage, error)
-      setDeviceError(errorMessage)
+      setIsInitialized(true)
+    } catch {
       setIsInitialized(true)
     } finally {
       setIsLoadingDevices(false)
@@ -258,26 +256,56 @@ export const useMediaDevice = () => {
     }
 
     try {
-      const tempStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      })
+      const [videoPermission, audioPermission] = await Promise.all([
+        navigator.permissions.query({ name: "camera" as PermissionName }),
+        navigator.permissions.query({ name: "microphone" as PermissionName })
+      ])
 
-      tempStream.getTracks().forEach(track => track.stop())
+      if (videoPermission.state === "granted" && audioPermission.state === "granted") {
+        const tempStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        })
+
+        tempStream.getTracks().forEach(track => track.stop())
+      } else {
+        const errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+        setDeviceError(errorMessage)
+        throw new Error(errorMessage)
+      }
     } catch (error: any) {
       console.warn("초기 미디어 접근 실패:", error)
 
-      const isPermissionError = error.name === "NotAllowedError"
-      const isDeviceNotFoundError = error.name === "NotFoundError"
+      const errorName = error.name || "Unknown"
+      let errorMessage = "미디어 장치 접근에 실패했습니다."
 
-      if (isPermissionError) {
-        setDeviceError("카메라 또는 마이크 접근 권한이 거부되었습니다.")
-      } else if (isDeviceNotFoundError) {
-        setDeviceError("카메라 또는 마이크를 찾을 수 없습니다.")
-      } else {
-        // 예상할 수 없는 에러는 상위로 전파
-        throw error
+      if (errorName === "NotAllowedError") {
+        try {
+          const [videoPermission, audioPermission] = await Promise.all([
+            navigator.permissions.query({ name: "camera" as PermissionName }),
+            navigator.permissions.query({ name: "microphone" as PermissionName })
+          ])
+
+          // 브라우저 설정에서 권한이 허용되었지만 OS에서 차단된 경우
+          if (videoPermission.state === "granted" || audioPermission.state === "granted") {
+            errorMessage = "카메라 또는 마이크가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 장치를 활성화해주세요."
+          } else {
+            // 브라우저 설정에서 권한이 거부된 경우
+            errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+          }
+        } catch {
+          errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+        }
+      } else if (errorName === "NotFoundError") {
+        errorMessage = "카메라 또는 마이크를 찾을 수 없습니다."
+      } else if (errorName === "NotReadableError") {
+        errorMessage = "카메라 또는 마이크가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 장치를 활성화해주세요."
+      } else if (errorName === "TrackStartError") {
+        errorMessage = "카메라 또는 마이크를 시작할 수 없습니다. 시스템 설정에서 장치가 활성화되어 있는지 확인해주세요."
       }
+
+      setDeviceError(errorMessage)
+      throw error
     }
   }
 
@@ -298,7 +326,9 @@ export const useMediaDevice = () => {
       return
     }
 
-    setDeviceError(null)
+    if (!deviceError) {
+      setDeviceError(null)
+    }
 
     const deviceList = await navigator.mediaDevices.enumerateDevices()
 
@@ -333,7 +363,6 @@ export const useMediaDevice = () => {
         audioDeviceId: firstAudioDeviceId,
       }))
     }
-
   }
 
   useEffect(() => {
@@ -407,6 +436,9 @@ export const useMediaDevice = () => {
     stopStream()
 
     try {
+      // 초기 미디어 접근 권한 요청
+      await requestMediaPermissions()
+
       const constraints = {
         video: isVideoSelected
           ? { deviceId: { exact: selectedDevices.videoDeviceId! } }
@@ -441,11 +473,26 @@ export const useMediaDevice = () => {
       } else if (errorName === "NotFoundError") {
         errorMessage = "선택한 카메라 또는 마이크를 찾을 수 없습니다."
       } else if (errorName === "NotReadableError") {
-        errorMessage = "선택한 장치에 접근할 수 없습니다. 다른 애플리케이션이 사용 중일 수 있습니다."
+        const device = isVideoSelected ? "카메라" : "마이크"
+        errorMessage = `${device}가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 ${device}를 활성화해주세요.`
+      } else if (errorName === "TrackStartError") {
+        const device = isVideoSelected ? "카메라" : "마이크"
+        errorMessage = `${device}를 시작할 수 없습니다. 시스템 설정에서 ${device}가 활성화되어 있는지 확인해주세요.`
       }
 
-      console.error(errorMessage, error)
-      setDeviceError(errorMessage)
+      if (!deviceError) {
+        console.error(errorMessage, error)
+        setDeviceError(errorMessage)
+      }
+
+      // 에러 발생 시 스트림 상태 초기화
+      setStream(null)
+      setStreamState({
+        hasVideo: false,
+        hasAudio: false,
+        isVideoEnabled: true,
+        isAudioEnabled: true,
+      })
 
       return null
     } finally {
