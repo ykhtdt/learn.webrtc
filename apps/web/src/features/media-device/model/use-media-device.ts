@@ -4,7 +4,6 @@ import {
   useEffect,
   useState,
   useRef,
-  useCallback,
 } from "react"
 
 interface MediaDeviceState {
