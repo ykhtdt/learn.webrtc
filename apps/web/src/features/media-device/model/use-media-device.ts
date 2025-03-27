@@ -51,7 +51,7 @@ export const useMediaDevice = () => {
   const isPermissionsApiUnavailable = () => isServerEnvironment() || !navigator.permissions
 
   const handleEnvironmentLimitation = (errorMessage: string) => {
-    console.error(errorMessage)
+    console.warn(errorMessage)
     setDeviceError(errorMessage)
     setDevices({
       videoDevices: [],
@@ -200,7 +200,7 @@ export const useMediaDevice = () => {
     // 예상되는 환경: 서버 렌더링 환경
     if (isNavigatorUndefined) {
       const errorMessage = "서버 환경에서 미디어 장치에 접근할 수 없습니다."
-      console.error(errorMessage)
+      console.warn(errorMessage)
       setDeviceError(errorMessage)
       setDevices({
         videoDevices: [],
@@ -208,14 +208,13 @@ export const useMediaDevice = () => {
       })
       setIsInitialized(true)
       setIsLoadingDevices(false)
-
       return
     }
 
     // 예상되는 환경: 브라우저 미지원 또는 비보안 컨텍스트(HTTP 등)
     if (isMediaDevicesUnavailable) {
       const errorMessage = "브라우저가 미디어 장치 API를 지원하지 않습니다."
-      console.error(errorMessage)
+      console.warn(errorMessage)
       setDeviceError(errorMessage)
       setDevices({
         videoDevices: [],
@@ -223,7 +222,6 @@ export const useMediaDevice = () => {
       })
       setIsInitialized(true)
       setIsLoadingDevices(false)
-
       return
     }
 
@@ -232,7 +230,6 @@ export const useMediaDevice = () => {
       await requestMediaPermissions()
       // 권한 요청이 성공한 경우에 장치 목록 획득
       await enumerateAndSetDevices()
-
       setIsInitialized(true)
     } catch {
       setIsInitialized(true)
@@ -255,35 +252,78 @@ export const useMediaDevice = () => {
     }
 
     try {
+      // 현재 권한 상태 확인
       const [videoPermission, audioPermission] = await Promise.all([
         navigator.permissions.query({ name: "camera" as PermissionName }),
         navigator.permissions.query({ name: "microphone" as PermissionName })
       ])
 
+      // 권한 상태 즉시 업데이트
+      setPermissions({
+        video: videoPermission.state,
+        audio: audioPermission.state,
+      })
+
+      /**
+       * 권한이 이미 허용된 경우
+       * 임시 미디어 스트림을 생성하여, 실제 장치에 접근할 수 있는지 테스트를 진행한다.
+       * 이후, 모든 트랙을 중지하여 리소스를 해제한다.
+       */
       if (videoPermission.state === "granted" && audioPermission.state === "granted") {
         const tempStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         })
-
         tempStream.getTracks().forEach(track => track.stop())
-      } else {
-        const errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
-        setDeviceError(errorMessage)
-        throw new Error(errorMessage)
+        return
+      }
+
+      // 권한이 거부되었거나 prompt 상태인 경우
+      // getUserMedia를 호출하여 브라우저의 권한 요청 UI를 표시
+      try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        })
+        tempStream.getTracks().forEach(track => track.stop())
+      } catch (error: any) {
+        // getUserMedia 호출 실패 시 권한 상태 다시 확인
+        const [newVideoPermission, newAudioPermission] = await Promise.all([
+          navigator.permissions.query({ name: "camera" as PermissionName }),
+          navigator.permissions.query({ name: "microphone" as PermissionName })
+        ])
+
+        // 권한 상태 즉시 업데이트
+        setPermissions({
+          video: newVideoPermission.state,
+          audio: newAudioPermission.state,
+        })
+
+        // 권한이 여전히 거부된 경우
+        if (newVideoPermission.state === "denied" || newAudioPermission.state === "denied") {
+          throw new Error("PERMISSION_DENIED")
+          // setDeviceError("카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요.")
+        }
+        throw error
       }
     } catch (error: any) {
-      console.warn("초기 미디어 접근 실패:", error)
+      console.warn("미디어 접근 실패:", error)
 
       const errorName = error.name || "Unknown"
       let errorMessage = "미디어 장치 접근에 실패했습니다."
 
-      if (errorName === "NotAllowedError") {
+      if (errorName === "NotAllowedError" || error.message === "PERMISSION_DENIED") {
         try {
           const [videoPermission, audioPermission] = await Promise.all([
             navigator.permissions.query({ name: "camera" as PermissionName }),
             navigator.permissions.query({ name: "microphone" as PermissionName })
           ])
+
+          // 권한 상태 즉시 업데이트
+          setPermissions({
+            video: videoPermission.state,
+            audio: audioPermission.state,
+          })
 
           // 브라우저 설정에서 권한이 허용되었지만 OS에서 차단된 경우
           if (videoPermission.state === "granted" || audioPermission.state === "granted") {
@@ -480,7 +520,7 @@ export const useMediaDevice = () => {
       }
 
       if (!deviceError) {
-        console.error(errorMessage, error)
+        console.warn(errorMessage, error)
         setDeviceError(errorMessage)
       }
 
