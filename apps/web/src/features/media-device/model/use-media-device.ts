@@ -407,18 +407,6 @@ export const useMediaDevice = () => {
   }
 
   useEffect(() => {
-    // 예상되는 환경: 서버 렌더링 환경
-    if (isServerEnvironment()) {
-      handleEnvironmentLimitation("서버 환경에서 미디어 장치에 접근할 수 없습니다.")
-      return
-    }
-
-    // 예상되는 환경: 브라우저 미지원 또는 비보안 컨텍스트(HTTP 등)
-    if (isMediaDevicesUnavailable()) {
-      handleEnvironmentLimitation("브라우저가 미디어 장치 API를 지원하지 않습니다.")
-      return
-    }
-
     // 장치가 변경되었을 때 장치 목록 갱신
     const handleDeviceChange = () => {
       if (isInitialized) {
@@ -670,6 +658,18 @@ export const useMediaDevice = () => {
   }, [permissions, previousPermissions, hasRequestedPermission])
 
   useEffect(() => {
+    // 예상되는 환경: 서버 렌더링 환경
+    if (isServerEnvironment()) {
+      handleEnvironmentLimitation("서버 환경에서 미디어 장치에 접근할 수 없습니다.")
+      return
+    }
+
+    // 예상되는 환경: 브라우저 미지원 또는 비보안 컨텍스트(HTTP 등)
+    if (isMediaDevicesUnavailable()) {
+      handleEnvironmentLimitation("브라우저가 미디어 장치 API를 지원하지 않습니다.")
+      return
+    }
+
     initializeMediaDevices()
   }, [])
 
