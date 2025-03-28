@@ -44,6 +44,8 @@ export const useMediaDevice = () => {
   })
   const [hasPermissionChanged, setHasPermissionChanged] = useState(false)
 
+  const [environmentError, setEnvironmentError] = useState<string | null>(null)
+  const [permissionError, setPermissionError] = useState<string | null>(null)
   const [deviceError, setDeviceError] = useState<string | null>(null)
 
   const isServerEnvironment = () => typeof navigator === "undefined"
@@ -677,6 +679,8 @@ export const useMediaDevice = () => {
     isConnectingStream,
     devices,
     selectedDevices,
+    environmentError,
+    permissionError,
     deviceError,
     stream,
     streamState,

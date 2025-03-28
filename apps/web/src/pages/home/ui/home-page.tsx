@@ -36,6 +36,8 @@ export const HomePage = () => {
     isConnectingStream,
     getVideoPermissionMessage,
     getAudioPermissionMessage,
+    environmentError,
+    permissionError,
     deviceError,
   } = useMediaDevice()
 
