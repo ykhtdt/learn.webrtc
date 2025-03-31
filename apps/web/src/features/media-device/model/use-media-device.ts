@@ -18,28 +18,13 @@ export const useMediaDevice = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const [isInitialized, setIsInitialized] = useState(false)
-  const [isLoadingDevices, setIsLoadingDevices] = useState(false)
+  const [isLoadingMediaDevices, setIsLoadingMediaDevices] = useState(false)
   const [isConnectingStream, setIsConnectingStream] = useState(false)
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
 
   const [environmentError, setEnvironmentError] = useState<string | null>(null)
   const [permissionError, setPermissionError] = useState<string | null>(null)
   const [deviceError, setDeviceError] = useState<string | null>(null)
-
-  const isServerEnvironment = () => typeof navigator === "undefined"
-  const isMediaDevicesUnavailable = () => isServerEnvironment() || !navigator.mediaDevices
-  const isPermissionsApiUnavailable = () => isServerEnvironment() || !navigator.permissions
-
-  const handleEnvironmentLimitation = (errorMessage: string) => {
-    console.warn(errorMessage)
-    setDeviceError(errorMessage)
-    setDevices({
-      videoDevices: [],
-      audioDevices: [],
-    })
-    setIsInitialized(true)
-    setIsLoadingDevices(false)
-  }
 
   const [devices, setDevices] = useState<MediaDeviceState>({
     videoDevices: [],
@@ -90,6 +75,40 @@ export const useMediaDevice = () => {
     }
   }
 
+  const isServerEnvironment = typeof navigator === "undefined"
+  const isMediaDevicesUnavailable = isServerEnvironment || !navigator.mediaDevices
+  const isPermissionsApiUnavailable = isServerEnvironment || !navigator.permissions
+
+  useEffect(() => {
+    if (isServerEnvironment) {
+      setDeviceError("서버 환경에서 미디어 장치에 접근할 수 없습니다.")
+      setIsInitialized(true)
+      return
+    }
+
+    if (isMediaDevicesUnavailable) {
+      setDeviceError("브라우저가 미디어 장치 API를 지원하지 않습니다.")
+      setIsInitialized(true)
+      return
+    }
+
+    if (isPermissionsApiUnavailable) {
+      setDeviceError("브라우저가 권한 API를 지원하지 않습니다.")
+      setIsInitialized(true)
+      return
+    }
+
+    const initializeMediaDevices = async () => {
+      // 권한 상태 확인
+      await checkPermissions()
+      // 장치 목록 조회
+      await getMediaDevices()
+    }
+
+    initializeMediaDevices()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const checkDevicePermission = async (device: "camera" | "microphone"): Promise<PermissionStatus> => {
     try {
       const { state } = await navigator.permissions.query({ name: device as PermissionName })
@@ -101,7 +120,7 @@ export const useMediaDevice = () => {
   }
 
   const checkPermissions = async () => {
-    if (isServerEnvironment() || isPermissionsApiUnavailable()) {
+    if (isServerEnvironment || isPermissionsApiUnavailable) {
       setPermissions({
         video: "unknown",
         audio: "unknown"
@@ -124,16 +143,6 @@ export const useMediaDevice = () => {
     } finally {
       setIsCheckingPermissions(false)
     }
-  }
-
-  /**
-   * 미디어 장치 초기화
-   * 1. 권한 상태 확인
-   * 2. 장치 목록 조회
-   */
-  const initializeMediaDevices = async () => {
-    await checkPermissions()
-    await getMediaDevices()
   }
 
   /**
@@ -172,7 +181,7 @@ export const useMediaDevice = () => {
    */
   const getMediaDevices = async () => {
     setDeviceError(null)
-    setIsLoadingDevices(true)
+    setIsLoadingMediaDevices(true)
 
     const isNavigatorUndefined = typeof navigator === "undefined"
     const isMediaDevicesUnavailable = !navigator?.mediaDevices
@@ -187,7 +196,7 @@ export const useMediaDevice = () => {
         audioDevices: [],
       })
       setIsInitialized(true)
-      setIsLoadingDevices(false)
+      setIsLoadingMediaDevices(false)
       return
     }
 
@@ -201,7 +210,7 @@ export const useMediaDevice = () => {
         audioDevices: [],
       })
       setIsInitialized(true)
-      setIsLoadingDevices(false)
+      setIsLoadingMediaDevices(false)
       return
     }
 
@@ -214,7 +223,7 @@ export const useMediaDevice = () => {
     } catch {
       setIsInitialized(true)
     } finally {
-      setIsLoadingDevices(false)
+      setIsLoadingMediaDevices(false)
     }
   }
 
@@ -335,7 +344,7 @@ export const useMediaDevice = () => {
    * 3. 사용자가 아직 선택하지 않은 경우 기본 장치 자동 선택
    */
   const enumerateAndSetDevices = async () => {
-    if (isMediaDevicesUnavailable() || !navigator.mediaDevices.enumerateDevices) {
+    if (isMediaDevicesUnavailable || !navigator.mediaDevices.enumerateDevices) {
       const errorMessage = "브라우저가 미디어 장치 목록 조회를 지원하지 않습니다."
       setDeviceError(errorMessage)
       setDevices({
@@ -420,7 +429,7 @@ export const useMediaDevice = () => {
     setDeviceError(null)
     setIsConnectingStream(true)
 
-    if (isMediaDevicesUnavailable() || !navigator.mediaDevices.getUserMedia) {
+    if (isMediaDevicesUnavailable || !navigator.mediaDevices.getUserMedia) {
       const errorMessage = "브라우저가 카메라/마이크 접근 기능을 지원하지 않습니다."
       setDeviceError(errorMessage)
       setIsConnectingStream(false)
@@ -618,25 +627,9 @@ export const useMediaDevice = () => {
     }
   }, [stream])
 
-  useEffect(() => {
-    // 예상되는 환경: 서버 렌더링 환경
-    if (isServerEnvironment()) {
-      handleEnvironmentLimitation("서버 환경에서 미디어 장치에 접근할 수 없습니다.")
-      return
-    }
-
-    // 예상되는 환경: 브라우저 미지원 또는 비보안 컨텍스트(HTTP 등)
-    if (isMediaDevicesUnavailable()) {
-      handleEnvironmentLimitation("브라우저가 미디어 장치 API를 지원하지 않습니다.")
-      return
-    }
-
-    initializeMediaDevices()
-  }, [])
-
   return {
     isInitialized,
-    isLoadingDevices,
+    isLoadingMediaDevices,
     isConnectingStream,
     devices,
     selectedDevices,
