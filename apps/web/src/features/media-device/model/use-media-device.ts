@@ -1,34 +1,18 @@
 "use client"
 
+import type {
+  MediaDeviceState,
+  SelectedDevicesState,
+  StreamState,
+  PermissionState,
+  PermissionStatus,
+} from "./types"
+
 import {
   useEffect,
   useState,
   useRef,
 } from "react"
-
-interface MediaDeviceState {
-  videoDevices: MediaDeviceInfo[]
-  audioDevices: MediaDeviceInfo[]
-}
-
-interface SelectedDevicesState {
-  videoDeviceId: string | null
-  audioDeviceId: string | null
-}
-
-interface StreamState {
-  hasAudio: boolean
-  hasVideo: boolean
-  isVideoEnabled: boolean
-  isAudioEnabled: boolean
-}
-
-type PermissionStatus = "granted" | "denied" | "prompt" | "unknown"
-
-interface PermissionState {
-  video: PermissionStatus
-  audio: PermissionStatus
-}
 
 export const useMediaDevice = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null)

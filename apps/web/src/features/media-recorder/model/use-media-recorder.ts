@@ -1,28 +1,16 @@
 "use client"
 
+import type {
+  MediaRecorderState,
+  MediaRecorderOptions,
+} from "./types"
+
 import {
   useEffect,
   useState,
   useCallback,
   useRef,
 } from "react"
-
-interface MediaRecorderState {
-  isRecording: boolean
-  hasVideo: boolean
-  hasAudio: boolean
-  recordedChunks: Blob[]
-  recorderError: string | null
-  duration: number
-  formattedDuration: string
-}
-
-interface MediaRecorderOptions {
-  mimeType?: string
-  videoBitsPerSecond?: number
-  audioBitsPerSecond?: number
-  bitsPerSecond?: number
-}
 
 export const useMediaRecorder = (
   stream: MediaStream | null,
