@@ -14,6 +14,8 @@ import {
   useRef,
 } from "react"
 
+import { ResultAsync } from "neverthrow"
+
 export const useMediaDevice = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
@@ -100,7 +102,7 @@ export const useMediaDevice = () => {
 
     const initializeMediaDevices = async () => {
       // 권한 상태 확인
-      await checkPermissions()
+      await checkMediaDevicePermissions()
       // 장치 목록 조회
       await getMediaDevices()
     }
@@ -109,40 +111,33 @@ export const useMediaDevice = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const checkDevicePermission = async (device: "camera" | "microphone"): Promise<PermissionStatus> => {
-    try {
-      const { state } = await navigator.permissions.query({ name: device as PermissionName })
-      return state
-    } catch (error) {
-      console.warn(`${device === "camera" ? "카메라" : "마이크"} 권한 상태를 확인할 수 없습니다:`, error)
-      return "unknown"
-    }
+  const getMediaDevicePermissionStatus = (device: "camera" | "microphone"): ResultAsync<PermissionStatus, Error> => {
+    return ResultAsync.fromPromise(
+      navigator.permissions.query({ name: device as PermissionName }),
+      (error) => new Error(`${device === "camera" ? "카메라" : "마이크"} 권한 상태를 확인할 수 없습니다: ${error}`)
+    ).map(({ state }) => state)
   }
 
-  const checkPermissions = async () => {
-    if (isServerEnvironment || isPermissionsApiUnavailable) {
-      setPermissions({
-        video: "unknown",
-        audio: "unknown"
-      })
-      return
-    }
-
+  const checkMediaDevicePermissions = async () => {
     setIsCheckingPermissions(true)
 
-    try {
-      const [videoPermission, audioPermission] = await Promise.all([
-        checkDevicePermission("camera"),
-        checkDevicePermission("microphone")
-      ])
+    const [videoResult, audioResult] = await Promise.all([
+      getMediaDevicePermissionStatus("camera"),
+      getMediaDevicePermissionStatus("microphone")
+    ])
 
-      setPermissions({
-        video: videoPermission,
-        audio: audioPermission,
-      })
-    } finally {
-      setIsCheckingPermissions(false)
-    }
+    setPermissions({
+      video: videoResult.match(
+        (value: PermissionStatus) => value,
+        () => "unknown"
+      ),
+      audio: audioResult.match(
+        (value: PermissionStatus) => value,
+        () => "unknown"
+      )
+    })
+
+    setIsCheckingPermissions(false)
   }
 
   /**
@@ -646,7 +641,6 @@ export const useMediaDevice = () => {
     isCheckingPermissions,
     getVideoPermissionMessage,
     getAudioPermissionMessage,
-    checkPermissions,
     videoRef,
     setVideoRef,
     toggleVideo,
