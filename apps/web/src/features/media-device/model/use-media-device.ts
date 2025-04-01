@@ -309,12 +309,13 @@ export const useMediaDevice = () => {
             audio: audioPermission.state,
           })
 
-          // 브라우저 설정에서 권한이 허용되었지만 OS에서 차단된 경우
-          if (videoPermission.state === "granted" || audioPermission.state === "granted") {
-            errorMessage = "카메라 또는 마이크가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 장치를 활성화해주세요."
-          } else {
-            // 브라우저 설정에서 권한이 거부된 경우
+          // 브라우저 설정에서 권한이 거부된 경우
+          if (videoPermission.state === "denied" || audioPermission.state === "denied") {
             errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+          }
+          // 브라우저 설정에서 권한이 허용되었지만 OS에서 차단된 경우
+          else if (videoPermission.state === "granted" || audioPermission.state === "granted") {
+            errorMessage = "카메라 또는 마이크가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 장치를 활성화해주세요."
           }
         } catch {
           errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
