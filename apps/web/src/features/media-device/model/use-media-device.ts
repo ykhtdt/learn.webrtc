@@ -144,12 +144,12 @@ export const useMediaDevice = () => {
   /**
    * 디바이스 종류와 ID를 받아 선택된 디바이스 상태를 업데이트합니다.
    */
-  const handleDeviceChange = (type: "video" | "audio", deviceId: string) => {
+  const handleDeviceChange = useCallback((type: "video" | "audio", deviceId: string) => {
     setSelectedDevices(prev => ({
       ...prev,
       [type === "video" ? "videoDeviceId" : "audioDeviceId"]: deviceId,
     }))
-  }
+  }, [])
 
   /**
    * 현재 활성화된 미디어 스트림을 정리합니다.
@@ -392,16 +392,16 @@ export const useMediaDevice = () => {
 
   useEffect(() => {
     // 장치가 변경되었을 때 장치 목록 갱신
-    const handleDeviceChange = () => {
+    const handleDeviceListChange = () => {
       if (isInitialized) {
         enumerateAndSetDevices()
       }
     }
 
-    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange)
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceListChange)
 
     return () => {
-      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange)
+      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceListChange)
     }
   }, [isInitialized, enumerateAndSetDevices])
 
