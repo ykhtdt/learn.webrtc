@@ -12,6 +12,7 @@ import {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from "react"
 
 import { ResultAsync } from "neverthrow"
@@ -111,14 +112,14 @@ export const useMediaDevice = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const getMediaDevicePermissionStatus = (device: "camera" | "microphone"): ResultAsync<PermissionStatus, Error> => {
+  const getMediaDevicePermissionStatus = useCallback((device: "camera" | "microphone"): ResultAsync<PermissionStatus, Error> => {
     return ResultAsync.fromPromise(
       navigator.permissions.query({ name: device as PermissionName }),
       (error) => new Error(`${device === "camera" ? "카메라" : "마이크"} 권한 상태를 확인할 수 없습니다: ${error}`)
     ).map(({ state }) => state)
-  }
+  }, [])
 
-  const checkMediaDevicePermissions = async () => {
+  const checkMediaDevicePermissions = useCallback(async () => {
     setIsCheckingPermissions(true)
 
     const [videoResult, audioResult] = await Promise.all([
@@ -138,7 +139,7 @@ export const useMediaDevice = () => {
     })
 
     setIsCheckingPermissions(false)
-  }
+  }, [getMediaDevicePermissionStatus])
 
   /**
    * 디바이스 종류와 ID를 받아 선택된 디바이스 상태를 업데이트합니다.
