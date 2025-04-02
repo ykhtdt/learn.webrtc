@@ -260,9 +260,9 @@ export const useMediaDevice = () => {
       return
     }
 
-    if (!deviceError) {
-      setDeviceError(null)
-    }
+    // if (!deviceError) {
+    //   setDeviceError(null)
+    // }
 
     const deviceList = await navigator.mediaDevices.enumerateDevices()
 
