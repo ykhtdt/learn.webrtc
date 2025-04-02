@@ -122,17 +122,17 @@ export const useMediaDevice = () => {
   const checkMediaDevicePermissions = useCallback(async () => {
     setIsCheckingPermissions(true)
 
-    const [videoResult, audioResult] = await Promise.all([
+    const [videoPermission, audioPermission] = await Promise.all([
       getMediaDevicePermissionStatus("camera"),
       getMediaDevicePermissionStatus("microphone")
     ])
 
     setPermissions({
-      video: videoResult.match(
+      video: videoPermission.match(
         (value: PermissionStatus) => value,
         () => "unknown"
       ),
-      audio: audioResult.match(
+      audio: audioPermission.match(
         (value: PermissionStatus) => value,
         () => "unknown"
       )
@@ -179,7 +179,7 @@ export const useMediaDevice = () => {
 
     // 권한 요청
     const permissionResult = await ResultAsync.fromPromise(
-      requestMediaPermissions(),
+      requestMediaDevicePermissions(),
       (error) => error
     )
 
@@ -197,14 +197,19 @@ export const useMediaDevice = () => {
    * 미디어 장치 접근 권한을 요청합니다.
    * 일시적인 스트림을 생성하여 권한을 요청한 후 즉시 해제합니다.
    */
-  const requestMediaPermissions = async () => {
-    try {
-      /**
-       * 권한이 이미 허용된 경우
-       * 임시 미디어 스트림을 생성하여, 실제 장치에 접근할 수 있는지 테스트를 진행한다.
-       * 이후, 모든 트랙을 중지하여 리소스를 해제한다.
-       */
-      if (permissions.video === "granted" && permissions.audio === "granted") {
+  const requestMediaDevicePermissions = async () => {
+    const [videoPermission, audioPermission] = await Promise.all([
+      getMediaDevicePermissionStatus("camera"),
+      getMediaDevicePermissionStatus("microphone")
+    ])
+
+    /**
+     * 권한이 이미 허용된 경우
+     * 임시 미디어 스트림을 생성하여, 실제 장치에 접근할 수 있는지 테스트를 진행한다.
+     * 이후, 모든 트랙을 중지하여 리소스를 해제한다.
+     */
+    if (videoPermission.isOk() && audioPermission.isOk()) {
+      if (videoPermission.value === "granted" && audioPermission.value === "granted") {
         const tempStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
@@ -212,7 +217,9 @@ export const useMediaDevice = () => {
         tempStream.getTracks().forEach(track => track.stop())
         return
       }
+    }
 
+    try {
       // 권한이 거부되었거나 prompt 상태인 경우
       // getUserMedia를 호출하여 브라우저의 권한 요청 UI를 표시
       try {
@@ -398,7 +405,7 @@ export const useMediaDevice = () => {
 
     try {
       // 초기 미디어 접근 권한 요청
-      await requestMediaPermissions()
+      await requestMediaDevicePermissions()
 
       const constraints = {
         video: isVideoSelected
