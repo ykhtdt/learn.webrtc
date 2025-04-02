@@ -155,7 +155,7 @@ export const useMediaDevice = () => {
    * 현재 활성화된 미디어 스트림을 정리합니다.
    * 모든 트랙을 중지하고 관련 상태를 초기화합니다.
    */
-  const stopStream = () => {
+  const stopStream = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop())
 
@@ -167,60 +167,30 @@ export const useMediaDevice = () => {
         isAudioEnabled: true,
       })
     }
-  }
+  }, [stream])
 
   /**
    * 미디어 장치 목록을 가져옵니다.
-   * 1. 환경 검사 (브라우저/서버)
-   * 2. 권한 요청
-   * 3. 장치 목록 조회
+   * 1. 권한 요청
+   * 2. 장치 목록 조회
    */
   const getMediaDevices = async () => {
-    setDeviceError(null)
     setIsLoadingMediaDevices(true)
 
-    const isNavigatorUndefined = typeof navigator === "undefined"
-    const isMediaDevicesUnavailable = !navigator?.mediaDevices
+    // 권한 요청
+    const permissionResult = await ResultAsync.fromPromise(
+      requestMediaPermissions(),
+      (error) => error
+    )
 
-    // 예상되는 환경: 서버 렌더링 환경
-    if (isNavigatorUndefined) {
-      const errorMessage = "서버 환경에서 미디어 장치에 접근할 수 없습니다."
-      console.warn(errorMessage)
-      setDeviceError(errorMessage)
-      setDevices({
-        videoDevices: [],
-        audioDevices: [],
-      })
-      setIsInitialized(true)
-      setIsLoadingMediaDevices(false)
-      return
-    }
-
-    // 예상되는 환경: 브라우저 미지원 또는 비보안 컨텍스트(HTTP 등)
-    if (isMediaDevicesUnavailable) {
-      const errorMessage = "브라우저가 미디어 장치 API를 지원하지 않습니다."
-      console.warn(errorMessage)
-      setDeviceError(errorMessage)
-      setDevices({
-        videoDevices: [],
-        audioDevices: [],
-      })
-      setIsInitialized(true)
-      setIsLoadingMediaDevices(false)
-      return
-    }
-
-    try {
-      // 미디어 장치 접근 권한 요청
-      await requestMediaPermissions()
-      // 권한 요청이 성공한 경우에 장치 목록 획득
+    // 권한 요청이 성공한 경우 권한 상태를 업데이트 후, 장치 목록 조회
+    if (permissionResult.isOk()) {
+      await checkMediaDevicePermissions()
       await enumerateAndSetDevices()
-      setIsInitialized(true)
-    } catch {
-      setIsInitialized(true)
-    } finally {
-      setIsLoadingMediaDevices(false)
     }
+
+    setIsInitialized(true)
+    setIsLoadingMediaDevices(false)
   }
 
   /**
@@ -228,33 +198,13 @@ export const useMediaDevice = () => {
    * 일시적인 스트림을 생성하여 권한을 요청한 후 즉시 해제합니다.
    */
   const requestMediaPermissions = async () => {
-    const isAccessibleUserMedia = !!navigator.mediaDevices?.getUserMedia
-
-    if (!isAccessibleUserMedia) {
-      const errorMessage = "브라우저가 미디어 접근 API를 지원하지 않습니다."
-      setDeviceError(errorMessage)
-      throw new Error(errorMessage)
-    }
-
     try {
-      // 현재 권한 상태 확인
-      const [videoPermission, audioPermission] = await Promise.all([
-        navigator.permissions.query({ name: "camera" as PermissionName }),
-        navigator.permissions.query({ name: "microphone" as PermissionName })
-      ])
-
-      // 권한 상태 즉시 업데이트
-      setPermissions({
-        video: videoPermission.state,
-        audio: audioPermission.state,
-      })
-
       /**
        * 권한이 이미 허용된 경우
        * 임시 미디어 스트림을 생성하여, 실제 장치에 접근할 수 있는지 테스트를 진행한다.
        * 이후, 모든 트랙을 중지하여 리소스를 해제한다.
        */
-      if (videoPermission.state === "granted" && audioPermission.state === "granted") {
+      if (permissions.video === "granted" && permissions.audio === "granted") {
         const tempStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
@@ -636,7 +586,6 @@ export const useMediaDevice = () => {
     stream,
     streamState,
     handleDeviceChange,
-    getMediaDevices,
     connectStream,
     stopStream,
     permissions,
