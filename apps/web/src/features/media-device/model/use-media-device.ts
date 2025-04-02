@@ -198,96 +198,48 @@ export const useMediaDevice = () => {
    * 일시적인 스트림을 생성하여 권한을 요청한 후 즉시 해제합니다.
    */
   const requestMediaDevicePermissions = async () => {
+    // 1. 브라우저 권한 상태 확인 - prompt, granted, denied
     const [videoPermission, audioPermission] = await Promise.all([
       getMediaDevicePermissionStatus("camera"),
       getMediaDevicePermissionStatus("microphone")
     ])
 
-    /**
-     * 권한이 이미 허용된 경우
-     * 임시 미디어 스트림을 생성하여, 실제 장치에 접근할 수 있는지 테스트를 진행한다.
-     * 이후, 모든 트랙을 중지하여 리소스를 해제한다.
-     */
     if (videoPermission.isOk() && audioPermission.isOk()) {
-      if (videoPermission.value === "granted" && audioPermission.value === "granted") {
-        const tempStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        })
-        tempStream.getTracks().forEach(track => track.stop())
+      if (videoPermission.value === "denied" || audioPermission.value === "denied") {
+        const errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
+        setDeviceError(errorMessage)
         return
       }
     }
 
-    try {
-      // 권한이 거부되었거나 prompt 상태인 경우
-      // getUserMedia를 호출하여 브라우저의 권한 요청 UI를 표시
-      try {
-        const tempStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        })
-        tempStream.getTracks().forEach(track => track.stop())
-      } catch (error: any) {
-        // getUserMedia 호출 실패 시 권한 상태 다시 확인
-        const [newVideoPermission, newAudioPermission] = await Promise.all([
-          navigator.permissions.query({ name: "camera" as PermissionName }),
-          navigator.permissions.query({ name: "microphone" as PermissionName })
-        ])
+    // 2. 브라우저에서 장치 권한이 모두 허용되어있다면, 미디어 스트림 요청 (권한 UI 표시 및 장치 액세스 테스트)
+    const requestMediaStream = await ResultAsync.fromPromise(
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }),
+      (error) => new Error(`미디어 스트림 요청에 실패했습니다. ${error}`)
+    )
 
-        // 권한 상태 즉시 업데이트
-        setPermissions({
-          video: newVideoPermission.state,
-          audio: newAudioPermission.state,
-        })
+    // 2-1. 스트림 요청 성공 시 - 브라우저 및 OS 모두 권한이 허용됨, 리소스 해제 후 종료
+    if (requestMediaStream.isOk()) {
+      requestMediaStream.value.getTracks().forEach(track => track.stop())
+      return
+    }
 
-        // 권한이 여전히 거부된 경우
-        if (newVideoPermission.state === "denied" || newAudioPermission.state === "denied") {
-          throw new Error("PERMISSION_DENIED")
-          // setDeviceError("카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요.")
-        }
-        throw error
-      }
-    } catch (error: any) {
-      console.warn("미디어 접근 실패:", error)
+    // 2-2. 스트림 요청 실패 시 - 브라우저 권한 상태 재확인
+    const [newVideoPermission, newAudioPermission] = await Promise.all([
+      getMediaDevicePermissionStatus("camera"),
+      getMediaDevicePermissionStatus("microphone")
+    ])
 
-      const errorName = error.name || "Unknown"
-      let errorMessage = "미디어 장치 접근에 실패했습니다."
+    if (newVideoPermission.isOk() && newAudioPermission.isOk()) {
+      // prompt -> denied or denied의 경우
+      let errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
 
-      if (errorName === "NotAllowedError" || error.message === "PERMISSION_DENIED") {
-        try {
-          const [videoPermission, audioPermission] = await Promise.all([
-            navigator.permissions.query({ name: "camera" as PermissionName }),
-            navigator.permissions.query({ name: "microphone" as PermissionName })
-          ])
-
-          // 권한 상태 즉시 업데이트
-          setPermissions({
-            video: videoPermission.state,
-            audio: audioPermission.state,
-          })
-
-          // 브라우저 설정에서 권한이 거부된 경우
-          if (videoPermission.state === "denied" || audioPermission.state === "denied") {
-            errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
-          }
-          // 브라우저 설정에서 권한이 허용되었지만 OS에서 차단된 경우
-          else if (videoPermission.state === "granted" || audioPermission.state === "granted") {
-            errorMessage = "카메라 또는 마이크가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 장치를 활성화해주세요."
-          }
-        } catch {
-          errorMessage = "카메라 또는 마이크 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요."
-        }
-      } else if (errorName === "NotFoundError") {
-        errorMessage = "카메라 또는 마이크를 찾을 수 없습니다."
-      } else if (errorName === "NotReadableError") {
+      // 브라우저 설정에서 권한이 허용되었지만 OS에서 차단된 경우
+      if (newVideoPermission.value === "granted" || newAudioPermission.value === "granted") {
         errorMessage = "카메라 또는 마이크가 시스템에서 비활성화되어 있습니다. 시스템 설정에서 장치를 활성화해주세요."
-      } else if (errorName === "TrackStartError") {
-        errorMessage = "카메라 또는 마이크를 시작할 수 없습니다. 시스템 설정에서 장치가 활성화되어 있는지 확인해주세요."
       }
 
       setDeviceError(errorMessage)
-      throw error
     }
   }
 
