@@ -270,26 +270,8 @@ export const useMediaDevice = () => {
     }))
   }, [])
 
-  /**
-   * 현재 활성화된 미디어 스트림을 정리합니다.
-   * 모든 트랙을 중지하고 관련 상태를 초기화합니다.
-   */
-  const stopStream = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-
-      setStream(null)
-      setStreamState({
-        hasVideo: false,
-        hasAudio: false,
-        isVideoEnabled: true,
-        isAudioEnabled: true,
-      })
-    }
-  }, [stream])
-
+  // 장치가 변경되었을 때 장치 목록 갱신
   useEffect(() => {
-    // 장치가 변경되었을 때 장치 목록 갱신
     const handleDeviceListChange = () => {
       if (isInitialized) {
         enumerateMediaDevices()
@@ -304,17 +286,24 @@ export const useMediaDevice = () => {
   }, [isInitialized, enumerateMediaDevices])
 
   /**
-   * 비디오 요소 참조를 설정
+   * 현재 활성화된 미디어 스트림을 정리합니다.
+   * 모든 트랙을 중지하고 관련 상태를 초기화합니다.
    */
-  const setVideoRef = (ref: HTMLVideoElement | null) => {
-    videoRef.current = ref
+  const stopStream = useCallback(() => {
+    const hasStream = !!stream
 
-    const isVideoStreamReady = ref && stream
+    if (hasStream) {
+      stream.getTracks().forEach(track => track.stop())
 
-    if (isVideoStreamReady) {
-      ref.srcObject = stream
+      setStream(null)
+      setStreamState({
+        hasVideo: false,
+        hasAudio: false,
+        isVideoEnabled: true,
+        isAudioEnabled: true,
+      })
     }
-  }
+  }, [stream])
 
   /**
    * 기존 스트림 정리 후, 선택한 장치로 미디어 스트림을 연결합니다.
@@ -325,9 +314,10 @@ export const useMediaDevice = () => {
 
     const isVideoSelected = !!selectedDevices.videoDeviceId
     const isAudioSelected = !!selectedDevices.audioDeviceId
+    const isMediaDevicesSelected = isVideoSelected && isAudioSelected
 
-    if (!isVideoSelected && !isAudioSelected) {
-      const errorMessage = "카메라 또는 마이크를 선택해주세요. 최소 하나의 미디어 장치가 필요합니다."
+    if (isMediaDevicesSelected) {
+      const errorMessage = "카메라 또는 마이크를 선택해주세요. 각 최소 하나의 미디어 장치가 필요합니다."
       setDeviceError(errorMessage)
       setIsConnectingStream(false)
       return
@@ -400,6 +390,17 @@ export const useMediaDevice = () => {
       setIsConnectingStream(false)
     }
   }
+
+  // 스트림이 변경될 때 비디오 요소에 연결
+  useEffect(() => {
+    if (videoRef.current) {
+      const isVideoStreamReady = videoRef.current && stream
+
+      if (isVideoStreamReady) {
+        videoRef.current.srcObject = stream
+      }
+    }
+  }, [stream])
 
   /**
    * 비디오 트랙을 켜거나 끕니다.
@@ -503,16 +504,18 @@ export const useMediaDevice = () => {
     }
   }
 
-  // 스트림이 변경될 때 비디오 요소에 연결
-  useEffect(() => {
-    if (videoRef.current) {
-      const isVideoStreamReady = videoRef.current && stream
+  /**
+   * 비디오 요소 참조를 설정
+   */
+  const setVideoRef = (ref: HTMLVideoElement | null) => {
+    videoRef.current = ref
 
-      if (isVideoStreamReady) {
-        videoRef.current.srcObject = stream
-      }
+    const isVideoStreamReady = ref && stream
+
+    if (isVideoStreamReady) {
+      ref.srcObject = stream
     }
-  }, [stream])
+  }
 
   return {
     isInitialized,
