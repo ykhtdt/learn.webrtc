@@ -351,6 +351,7 @@ export const useMediaDevice = () => {
       }
     }
 
+    // 초기 권한 체크에 성공한 뒤, 브라우저 또는 OS에서 다시 권한이 변경된 경우 에러 발생
     if (mediaStream.isErr()) {
       const errorName = mediaStream.error.name || "Unknown"
       let errorMessage = "미디어 스트림 연결에 실패했습니다."
