@@ -317,19 +317,11 @@ export const useMediaDevice = () => {
   }
 
   /**
-   * 선택한 장치로 미디어 스트림을 연결합니다.
-   * 기존 스트림은 자동으로 정리됩니다.
+   * 기존 스트림 정리 후, 선택한 장치로 미디어 스트림을 연결합니다.
    */
   const connectStream = async () => {
     setDeviceError(null)
     setIsConnectingStream(true)
-
-    if (isMediaDevicesUnavailable || !navigator.mediaDevices.getUserMedia) {
-      const errorMessage = "브라우저가 카메라/마이크 접근 기능을 지원하지 않습니다."
-      setDeviceError(errorMessage)
-      setIsConnectingStream(false)
-      return
-    }
 
     const isVideoSelected = !!selectedDevices.videoDeviceId
     const isAudioSelected = !!selectedDevices.audioDeviceId
