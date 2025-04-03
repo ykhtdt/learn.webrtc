@@ -314,9 +314,9 @@ export const useMediaDevice = () => {
 
     const isVideoSelected = !!selectedDevices.videoDeviceId
     const isAudioSelected = !!selectedDevices.audioDeviceId
-    const isMediaDevicesSelected = isVideoSelected && isAudioSelected
+    const isMediaDeviceNotSelected = !isVideoSelected && !isAudioSelected
 
-    if (isMediaDevicesSelected) {
+    if (isMediaDeviceNotSelected) {
       const errorMessage = "카메라 또는 마이크를 선택해주세요. 각 최소 하나의 미디어 장치가 필요합니다."
       setDeviceError(errorMessage)
       setIsConnectingStream(false)
