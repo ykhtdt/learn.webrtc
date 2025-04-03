@@ -195,9 +195,8 @@ export const useMediaDevice = () => {
 
   /**
    * 미디어 장치 접근 권한을 요청합니다.
-   * 일시적인 스트림을 생성하여 권한을 요청한 후 즉시 해제합니다.
    */
-  const requestMediaDevicePermissions = async () => {
+  const requestMediaDevicePermissions = useCallback(async () => {
     // 1. 브라우저 권한 상태 확인 - prompt, granted, denied
     const [videoPermission, audioPermission] = await Promise.all([
       getMediaDevicePermissionStatus("camera"),
@@ -241,7 +240,7 @@ export const useMediaDevice = () => {
 
       setDeviceError(errorMessage)
     }
-  }
+  }, [getMediaDevicePermissionStatus])
 
   /**
    * 미디어 장치 목록을 조회하고 기본 장치를 자동 선택합니다.
