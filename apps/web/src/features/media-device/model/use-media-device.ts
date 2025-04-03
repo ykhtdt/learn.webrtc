@@ -326,37 +326,33 @@ export const useMediaDevice = () => {
     // 이전 스트림의 트랙 중지
     stopStream()
 
-    try {
-      // 초기 미디어 접근 권한 요청
-      await requestMediaDevicePermissions()
+    const constraints = {
+      video: { deviceId: { exact: selectedDevices.videoDeviceId! } },
+      audio: { deviceId: { exact: selectedDevices.audioDeviceId! } },
+    }
 
-      const constraints = {
-        video: isVideoSelected
-          ? { deviceId: { exact: selectedDevices.videoDeviceId! } }
-          : false,
-        audio: isAudioSelected
-          ? { deviceId: { exact: selectedDevices.audioDeviceId! } }
-          : false
-      }
+    const mediaStream = await ResultAsync.fromPromise(
+      navigator.mediaDevices.getUserMedia(constraints),
+      (error) => error as Error
+    ).map((stream) => stream)
 
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints)
-      setStream(newStream)
-
+    if (mediaStream.isOk()) {
+      setStream(mediaStream.value)
       setStreamState({
-        hasVideo: newStream.getVideoTracks().length > 0,
-        hasAudio: newStream.getAudioTracks().length > 0,
+        hasVideo: mediaStream.value.getVideoTracks().length > 0,
+        hasAudio: mediaStream.value.getAudioTracks().length > 0,
         isVideoEnabled: true,
         isAudioEnabled: true,
       })
 
-      // 비디오 요소가 있는 경우 스트림 연결
+      // 스트림 연결
       if (videoRef.current) {
-        videoRef.current.srcObject = newStream
+        videoRef.current.srcObject = mediaStream.value
       }
+    }
 
-      return newStream
-    } catch (error: any) {
-      const errorName = error.name || "Unknown"
+    if (mediaStream.isErr()) {
+      const errorName = mediaStream.error.name || "Unknown"
       let errorMessage = "미디어 스트림 연결에 실패했습니다."
 
       if (errorName === "NotAllowedError") {
@@ -371,10 +367,7 @@ export const useMediaDevice = () => {
         errorMessage = `${device}를 시작할 수 없습니다. 시스템 설정에서 ${device}가 활성화되어 있는지 확인해주세요.`
       }
 
-      if (!deviceError) {
-        console.warn(errorMessage, error)
-        setDeviceError(errorMessage)
-      }
+      setDeviceError(errorMessage)
 
       // 에러 발생 시 스트림 상태 초기화
       setStream(null)
@@ -384,11 +377,9 @@ export const useMediaDevice = () => {
         isVideoEnabled: true,
         isAudioEnabled: true,
       })
-
-      return null
-    } finally {
-      setIsConnectingStream(false)
     }
+
+    setIsConnectingStream(false)
   }
 
   // 스트림이 변경될 때 비디오 요소에 연결
