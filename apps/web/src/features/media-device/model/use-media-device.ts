@@ -25,8 +25,6 @@ export const useMediaDevice = () => {
   const [isConnectingStream, setIsConnectingStream] = useState(false)
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
 
-  const [environmentError, setEnvironmentError] = useState<string | null>(null)
-  const [permissionError, setPermissionError] = useState<string | null>(null)
   const [deviceError, setDeviceError] = useState<string | null>(null)
 
   const [devices, setDevices] = useState<MediaDeviceState>({
@@ -79,12 +77,19 @@ export const useMediaDevice = () => {
   }
 
   const isServerEnvironment = typeof navigator === "undefined"
-  const isMediaDevicesUnavailable = isServerEnvironment || !navigator.mediaDevices
   const isPermissionsApiUnavailable = isServerEnvironment || !navigator.permissions
+  const isMediaDevicesUnavailable = isServerEnvironment || !navigator.mediaDevices
+  const isEnumerateMediaDevicesUnavailable = isServerEnvironment || !navigator.mediaDevices.enumerateDevices
 
   useEffect(() => {
     if (isServerEnvironment) {
       setDeviceError("서버 환경에서 미디어 장치에 접근할 수 없습니다.")
+      setIsInitialized(true)
+      return
+    }
+
+    if (isPermissionsApiUnavailable) {
+      setDeviceError("브라우저가 권한 API를 지원하지 않습니다.")
       setIsInitialized(true)
       return
     }
@@ -95,8 +100,8 @@ export const useMediaDevice = () => {
       return
     }
 
-    if (isPermissionsApiUnavailable) {
-      setDeviceError("브라우저가 권한 API를 지원하지 않습니다.")
+    if (isEnumerateMediaDevicesUnavailable) {
+      setDeviceError("브라우저가 미디어 장치 목록 조회를 지원하지 않습니다.")
       setIsInitialized(true)
       return
     }
@@ -140,58 +145,6 @@ export const useMediaDevice = () => {
 
     setIsCheckingPermissions(false)
   }, [getMediaDevicePermissionStatus])
-
-  /**
-   * 디바이스 종류와 ID를 받아 선택된 디바이스 상태를 업데이트합니다.
-   */
-  const handleDeviceChange = useCallback((type: "video" | "audio", deviceId: string) => {
-    setSelectedDevices(prev => ({
-      ...prev,
-      [type === "video" ? "videoDeviceId" : "audioDeviceId"]: deviceId,
-    }))
-  }, [])
-
-  /**
-   * 현재 활성화된 미디어 스트림을 정리합니다.
-   * 모든 트랙을 중지하고 관련 상태를 초기화합니다.
-   */
-  const stopStream = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-
-      setStream(null)
-      setStreamState({
-        hasVideo: false,
-        hasAudio: false,
-        isVideoEnabled: true,
-        isAudioEnabled: true,
-      })
-    }
-  }, [stream])
-
-  /**
-   * 미디어 장치 목록을 가져옵니다.
-   * 1. 권한 요청
-   * 2. 장치 목록 조회
-   */
-  const getMediaDevices = async () => {
-    setIsLoadingMediaDevices(true)
-
-    // 권한 요청
-    const permissionResult = await ResultAsync.fromPromise(
-      requestMediaDevicePermissions(),
-      (error) => error
-    )
-
-    // 권한 요청이 성공한 경우 권한 상태를 업데이트 후, 장치 목록 조회
-    if (permissionResult.isOk()) {
-      await checkMediaDevicePermissions()
-      await enumerateAndSetDevices()
-    }
-
-    setIsInitialized(true)
-    setIsLoadingMediaDevices(false)
-  }
 
   /**
    * 미디어 장치 접근 권한을 요청합니다.
@@ -248,21 +201,7 @@ export const useMediaDevice = () => {
    * 2. 카메라/마이크 장치 목록 가져오기
    * 3. 사용자가 아직 선택하지 않은 경우 기본 장치 자동 선택
    */
-  const enumerateAndSetDevices = async () => {
-    if (isMediaDevicesUnavailable || !navigator.mediaDevices.enumerateDevices) {
-      const errorMessage = "브라우저가 미디어 장치 목록 조회를 지원하지 않습니다."
-      setDeviceError(errorMessage)
-      setDevices({
-        videoDevices: [],
-        audioDevices: [],
-      })
-      return
-    }
-
-    // if (!deviceError) {
-    //   setDeviceError(null)
-    // }
-
+  const enumerateMediaDevices = useCallback(async () => {
     const deviceList = await navigator.mediaDevices.enumerateDevices()
 
     const videoDevices = deviceList.filter(device => device.kind === "videoinput")
@@ -296,13 +235,64 @@ export const useMediaDevice = () => {
         audioDeviceId: firstAudioDeviceId,
       }))
     }
-  }
+  }, [selectedDevices])
+
+  /**
+   * 미디어 장치 목록을 가져옵니다.
+   */
+  const getMediaDevices = useCallback(async () => {
+    setIsLoadingMediaDevices(true)
+
+    // 권한 요청
+    const permissionResult = await ResultAsync.fromPromise(
+      requestMediaDevicePermissions(),
+      (error) => error
+    )
+
+    // 권한 요청이 성공한 경우 권한 상태를 업데이트 후, 장치 목록 조회
+    if (permissionResult.isOk()) {
+      await checkMediaDevicePermissions()
+      await enumerateMediaDevices()
+    }
+
+    setIsInitialized(true)
+    setIsLoadingMediaDevices(false)
+  }, [checkMediaDevicePermissions, requestMediaDevicePermissions, enumerateMediaDevices])
+
+
+  /**
+   * 디바이스 종류와 ID를 받아 선택된 디바이스 상태를 업데이트합니다.
+   */
+  const handleDeviceChange = useCallback((type: "video" | "audio", deviceId: string) => {
+    setSelectedDevices(prev => ({
+      ...prev,
+      [type === "video" ? "videoDeviceId" : "audioDeviceId"]: deviceId,
+    }))
+  }, [])
+
+  /**
+   * 현재 활성화된 미디어 스트림을 정리합니다.
+   * 모든 트랙을 중지하고 관련 상태를 초기화합니다.
+   */
+  const stopStream = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+
+      setStream(null)
+      setStreamState({
+        hasVideo: false,
+        hasAudio: false,
+        isVideoEnabled: true,
+        isAudioEnabled: true,
+      })
+    }
+  }, [stream])
 
   useEffect(() => {
     // 장치가 변경되었을 때 장치 목록 갱신
     const handleDeviceListChange = () => {
       if (isInitialized) {
-        enumerateAndSetDevices()
+        enumerateMediaDevices()
       }
     }
 
@@ -311,7 +301,7 @@ export const useMediaDevice = () => {
     return () => {
       navigator.mediaDevices.removeEventListener("devicechange", handleDeviceListChange)
     }
-  }, [isInitialized, enumerateAndSetDevices])
+  }, [isInitialized, enumerateMediaDevices])
 
   /**
    * 비디오 요소 참조를 설정
@@ -534,26 +524,22 @@ export const useMediaDevice = () => {
 
   return {
     isInitialized,
+    isCheckingPermissions,
     isLoadingMediaDevices,
     isConnectingStream,
+    permissions,
     devices,
     selectedDevices,
-    environmentError,
-    permissionError,
-    deviceError,
+    handleDeviceChange,
     stream,
     streamState,
-    handleDeviceChange,
     connectStream,
-    stopStream,
-    permissions,
-    isCheckingPermissions,
-    getVideoPermissionMessage,
-    getAudioPermissionMessage,
-    videoRef,
     setVideoRef,
     toggleVideo,
     toggleAudio,
+    getVideoPermissionMessage,
+    getAudioPermissionMessage,
+    deviceError,
     disconnectVideo,
     disconnectAudio,
   }
